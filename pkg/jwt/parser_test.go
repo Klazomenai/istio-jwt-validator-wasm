@@ -63,7 +63,22 @@ func TestExtractJTI(t *testing.T) {
 	// Helper to create JWT with specific JTI
 	createJWT := func(jti string) string {
 		header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"RS256","typ":"JWT"}`))
-		payload, _ := json.Marshal(map[string]interface{}{"jti": jti})
+		payload, err := json.Marshal(map[string]interface{}{"jti": jti})
+		if err != nil {
+			t.Fatalf("Failed to marshal test payload: %v", err)
+		}
+		encodedPayload := base64.RawURLEncoding.EncodeToString(payload)
+		signature := base64.RawURLEncoding.EncodeToString([]byte("signature"))
+		return header + "." + encodedPayload + "." + signature
+	}
+
+	// Helper to create JWT with specific claim value (any type)
+	createJWTWithClaim := func(key string, value interface{}) string {
+		header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"RS256","typ":"JWT"}`))
+		payload, err := json.Marshal(map[string]interface{}{key: value})
+		if err != nil {
+			t.Fatalf("Failed to marshal test payload: %v", err)
+		}
 		encodedPayload := base64.RawURLEncoding.EncodeToString(payload)
 		signature := base64.RawURLEncoding.EncodeToString([]byte("signature"))
 		return header + "." + encodedPayload + "." + signature
@@ -94,11 +109,29 @@ func TestExtractJTI(t *testing.T) {
 			name: "missing JTI claim",
 			token: func() string {
 				header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"RS256","typ":"JWT"}`))
-				payload, _ := json.Marshal(map[string]interface{}{"sub": "user123"}) // no jti field
+				payload, err := json.Marshal(map[string]interface{}{"sub": "user123"}) // no jti field
+				if err != nil {
+					t.Fatalf("Failed to marshal test payload: %v", err)
+				}
 				encodedPayload := base64.RawURLEncoding.EncodeToString(payload)
 				signature := base64.RawURLEncoding.EncodeToString([]byte("signature"))
 				return header + "." + encodedPayload + "." + signature
 			}(),
+			wantErr: true,
+		},
+		{
+			name:    "valid base64, invalid JSON payload",
+			token:   "header." + base64.RawURLEncoding.EncodeToString([]byte("not valid json")) + ".signature",
+			wantErr: true,
+		},
+		{
+			name:    "jti claim is number not string",
+			token:   createJWTWithClaim("jti", 12345),
+			wantErr: true,
+		},
+		{
+			name:    "jti claim is boolean not string",
+			token:   createJWTWithClaim("jti", true),
 			wantErr: true,
 		},
 	}
