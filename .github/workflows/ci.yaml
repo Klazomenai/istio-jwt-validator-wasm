@@ -64,7 +64,7 @@ jobs:
 
       - name: Run gosec
         run: |
-          devenv shell -- go install github.com/securego/gosec/v2/cmd/gosec@latest
+          GOOS=linux GOARCH=amd64 devenv shell -- go install github.com/securego/gosec/v2/cmd/gosec@latest
           devenv shell -- gosec -fmt=json -out=gosec-report.json ./... || true
 
       - name: Upload gosec report
@@ -77,7 +77,7 @@ jobs:
 
       - name: Run govulncheck
         run: |
-          devenv shell -- go install golang.org/x/vuln/cmd/govulncheck@latest
+          GOOS=linux GOARCH=amd64 devenv shell -- go install golang.org/x/vuln/cmd/govulncheck@latest
           devenv shell -- govulncheck ./...
 
   test:
@@ -100,7 +100,7 @@ jobs:
         run: devenv shell -- echo "devenv ready"
 
       - name: Run tests with coverage
-        run: devenv shell -- go test -v -race -coverprofile=coverage.out -covermode=atomic ./pkg/...
+        run: GOOS=linux GOARCH=amd64 devenv shell -- go test -v -race -coverprofile=coverage.out -covermode=atomic ./pkg/...
 
       - name: Generate coverage report
         run: devenv shell -- go tool cover -func=coverage.out
