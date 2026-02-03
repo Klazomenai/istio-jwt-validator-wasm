@@ -65,11 +65,12 @@ jobs:
       - name: Run gosec
         run: |
           devenv shell -- go install github.com/securego/gosec/v2/cmd/gosec@latest
-          devenv shell -- gosec -fmt=json -out=gosec-report.json ./... || true
+          # TODO(spike): Re-evaluate -exclude-dir=.devenv - currently excludes module cache to prevent gosec SSA analyzer panic
+          devenv shell -- gosec -fmt=json -out=gosec-report.json -exclude-dir=.devenv ./...
 
       - name: Upload gosec report
         uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && hashFiles('gosec-report.json') != ''
         with:
           name: gosec-report
           path: gosec-report.json
