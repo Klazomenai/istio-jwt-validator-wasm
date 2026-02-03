@@ -16,6 +16,7 @@ result-*
 .devenv.flake.nix
 devenv.local.nix
 .direnv/
+.pre-commit-config.yaml
 
 # IDE
 .vscode/
