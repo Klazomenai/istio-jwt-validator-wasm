@@ -1,0 +1,40 @@
+version: 2
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  enable:
+    - errcheck      # Check for unchecked errors
+    - govet         # Vet examines Go source code
+    - staticcheck   # Static analysis
+    - unused        # Check for unused code
+    - misspell      # Check spelling
+    - gosec         # Security checks
+    - ineffassign   # Detect ineffectual assignments
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+
+  govet:
+    enable-all: true
+
+  gosec:
+    severity: medium
+    confidence: medium
+
+issues:
+  exclude-use-default: false
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+  exclude-rules:
+    # Exclude linting for test files on certain rules
+    - path: _test\.go
+      linters:
+        - gosec
+        - errcheck
+

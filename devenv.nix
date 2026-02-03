@@ -13,6 +13,7 @@
     gopls
     gotools
     go-tools
+    golangci-lint
 
     # WASM tooling
     wasmtime
@@ -47,10 +48,14 @@
       go tool cover -html=coverage.out -o coverage.html
       echo "Coverage report: coverage.html"
     '';
+
+    lint.exec = ''
+      golangci-lint run ./...
+    '';
   };
 
-  # Pre-commit hooks
-  pre-commit.hooks = {
+  # Git hooks
+  git-hooks.hooks = {
     gofmt.enable = true;
     govet.enable = true;
   };
@@ -69,6 +74,7 @@
     echo "  build-wasm        - Build WASM plugin (native Go WASM)"
     echo "  test              - Run tests with coverage"
     echo "  test-coverage     - Generate HTML coverage report"
+    echo "  lint              - Run golangci-lint"
     echo ""
     go version
     echo ""

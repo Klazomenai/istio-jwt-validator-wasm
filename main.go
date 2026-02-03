@@ -1,3 +1,5 @@
+// Package main implements the JWT validator WASM plugin for Istio/Envoy.
+// This plugin validates JWT tokens from request bodies and sets HttpOnly cookies.
 package main
 
 import (
@@ -13,7 +15,7 @@ type vmContext struct {
 	types.DefaultVMContext
 }
 
-func (*vmContext) NewPluginContext(contextID uint32) types.PluginContext {
+func (*vmContext) NewPluginContext(_ uint32) types.PluginContext {
 	return &pluginContext{}
 }
 
@@ -21,7 +23,7 @@ type pluginContext struct {
 	types.DefaultPluginContext
 }
 
-func (*pluginContext) NewHttpContext(contextID uint32) types.HttpContext {
+func (*pluginContext) NewHttpContext(_ uint32) types.HttpContext {
 	return &httpContext{}
 }
 

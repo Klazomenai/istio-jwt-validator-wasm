@@ -1,3 +1,4 @@
+// Package jwt provides JWT token parsing and validation utilities.
 package jwt
 
 import (
