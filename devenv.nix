@@ -25,12 +25,6 @@
     gnumake
   ];
 
-  # Environment variables
-  env = {
-    GOOS = "wasip1";
-    GOARCH = "wasm";
-  };
-
   # Scripts
   scripts = {
     build-wasm.exec = ''
