@@ -1,0 +1,113 @@
+name: Manual Build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Manual Build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generate build metadata
+        id: meta
+        run: |
+          BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          BRANCH_NAME=${BRANCH_NAME//\//-}
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          BUILD_TAG="${BRANCH_NAME}-${SHORT_SHA}"
+          TIMESTAMP=$(date -u +"%Y%m%d-%H%M%S")
+
+          echo "branch=${BRANCH_NAME}" >> $GITHUB_OUTPUT
+          echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
+          echo "build_tag=${BUILD_TAG}" >> $GITHUB_OUTPUT
+          echo "timestamp=${TIMESTAMP}" >> $GITHUB_OUTPUT
+          echo "full_image=ghcr.io/klazomenai/istio-jwt-validator-wasm:${BUILD_TAG}" >> $GITHUB_OUTPUT
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Build WASM plugin (pure Nix)
+        run: nix build .#wasm --print-build-logs
+
+      - name: Copy WASM artifact
+        run: cp result/plugin.wasm plugin.wasm
+
+      - name: Build OCI image (pure Nix)
+        run: nix build .#oci-image --print-build-logs
+
+      - name: Load and retag image
+        run: |
+          docker load < result
+          docker tag ghcr.io/klazomenai/istio-jwt-validator-wasm:0.1.0-dev \
+            ${{ steps.meta.outputs.full_image }}
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push image
+        run: docker push ${{ steps.meta.outputs.full_image }}
+
+      - name: Upload WASM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: manual-build-${{ steps.meta.outputs.build_tag }}
+          path: plugin.wasm
+          retention-days: 14
+
+      - name: Generate summary
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ## Manual Build Complete ✓
+
+          **Branch**: \`${{ steps.meta.outputs.branch }}\`
+          **Commit**: \`${{ steps.meta.outputs.short_sha }}\` (\`${{ github.sha }}\`)
+          **Built**: ${{ steps.meta.outputs.timestamp }}
+          **Image**: \`${{ steps.meta.outputs.full_image }}\`
+
+          ### Usage in WasmPlugin
+
+          \`\`\`yaml
+          apiVersion: extensions.istio.io/v1alpha1
+          kind: WasmPlugin
+          metadata:
+            name: jwt-validator-test
+            namespace: istio-system
+          spec:
+            url: oci://${{ steps.meta.outputs.full_image }}
+            pluginConfig:
+              cluster: "outbound|8080||jwt-service.namespace.svc.cluster.local"
+              validateEndpoint: "/api/validate"
+              csrfHeaderName: "X-CSRF-Token"
+          \`\`\`
+
+          ### Download WASM Binary
+
+          Available in workflow artifacts: \`manual-build-${{ steps.meta.outputs.build_tag }}\`
+
+          ### Testing
+
+          \`\`\`bash
+          # Pull image
+          docker pull ${{ steps.meta.outputs.full_image }}
+
+          # Extract WASM
+          docker create --name extract ${{ steps.meta.outputs.full_image }}
+          docker cp extract:/plugin/plugin.wasm ./plugin.wasm
+          docker rm extract
+          \`\`\`
+
+          **Build Method**: Pure Nix flake (fully reproducible)
+          EOF

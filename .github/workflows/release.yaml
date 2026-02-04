@@ -1,0 +1,104 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  release:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "short_version=${VERSION#v}" >> $GITHUB_OUTPUT
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Build WASM plugin (pure Nix)
+        run: nix build .#wasm --print-build-logs
+
+      - name: Copy WASM artifact
+        run: cp result/plugin.wasm plugin.wasm
+
+      - name: Generate checksums
+        run: |
+          sha256sum plugin.wasm > plugin.wasm.sha256
+          cat plugin.wasm.sha256
+
+      - name: Build OCI image (pure Nix - reproducible!)
+        run: nix build .#oci-image --print-build-logs
+
+      - name: Load and tag image
+        run: |
+          docker load < result
+          docker tag ghcr.io/klazomenai/istio-jwt-validator-wasm:0.1.0-dev \
+            ghcr.io/klazomenai/istio-jwt-validator-wasm:${{ steps.version.outputs.version }}
+          docker tag ghcr.io/klazomenai/istio-jwt-validator-wasm:0.1.0-dev \
+            ghcr.io/klazomenai/istio-jwt-validator-wasm:latest
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push images
+        run: |
+          docker push ghcr.io/klazomenai/istio-jwt-validator-wasm:${{ steps.version.outputs.version }}
+
+          # Only push latest for stable releases
+          if [[ ! "${{ steps.version.outputs.version }}" =~ (alpha|beta|rc) ]]; then
+            docker push ghcr.io/klazomenai/istio-jwt-validator-wasm:latest
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: Release ${{ steps.version.outputs.version }}
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.version, 'alpha') || contains(steps.version.outputs.version, 'beta') }}
+          generate_release_notes: true
+          files: |
+            plugin.wasm
+            plugin.wasm.sha256
+          body: |
+            ## Installation
+
+            ### OCI Image (Reproducible Nix Build)
+            ```yaml
+            apiVersion: extensions.istio.io/v1alpha1
+            kind: WasmPlugin
+            metadata:
+              name: jwt-validator
+            spec:
+              url: oci://ghcr.io/klazomenai/istio-jwt-validator-wasm:${{ steps.version.outputs.version }}
+            ```
+
+            ### Direct WASM Binary
+            Download `plugin.wasm` from this release and verify with `plugin.wasm.sha256`.
+
+            ```bash
+            # Verify checksum
+            sha256sum -c plugin.wasm.sha256
+
+            # Reproduce build (Nix)
+            nix build github:klazomenai/istio-jwt-validator-wasm/${{ steps.version.outputs.version }}#wasm
+            ```
+
+            **Build Provenance**: This release was built with Nix flakes for full reproducibility.

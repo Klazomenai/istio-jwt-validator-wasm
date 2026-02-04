@@ -1,0 +1,38 @@
+# Binaries
+*.wasm
+*.so
+*.dylib
+*.dll
+*.exe
+/bin/
+
+# Go
+vendor/
+
+# Nix/devenv
+result
+result-*
+.devenv/
+.devenv.flake.nix
+devenv.local.nix
+.direnv/
+.pre-commit-config.yaml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test coverage
+coverage.out
+coverage.html
+
+# Temporary files
+*.tmp
+*.log
