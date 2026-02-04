@@ -61,7 +61,7 @@ jobs:
         run: docker push ${{ steps.meta.outputs.full_image }}
 
       - name: Upload WASM artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: manual-build-${{ steps.meta.outputs.build_tag }}
           path: plugin.wasm
