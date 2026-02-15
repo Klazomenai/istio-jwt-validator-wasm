@@ -1,14 +1,50 @@
 # istio-jwt-validator-wasm
 
+> **This repository is ARCHIVED.** See [Archive Notice](#archive-notice) below.
+
 [![CI](https://github.com/Klazomenai/istio-jwt-validator-wasm/actions/workflows/ci.yaml/badge.svg)](https://github.com/Klazomenai/istio-jwt-validator-wasm/actions/workflows/ci.yaml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/Klazomenai/istio-jwt-validator-wasm)](https://goreportcard.com/report/github.com/Klazomenai/istio-jwt-validator-wasm)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 Envoy WASM plugin for JWT validation endpoint with HttpOnly cookie management.
 
-> **⚠️ Alpha Status**: v0.1.0-alpha - Not production ready.
+## Archive Notice
 
-## Overview
+**Decision Date**: 2026-02-04
+**Status**: Superseded
+
+### Why This Repository Is Archived
+
+This WASM plugin was intended to implement a `/api/validate` endpoint with CSRF validation and HttpOnly cookie management as an Envoy WASM filter running inside the Istio Gateway. After architectural analysis, this approach was rejected for the following reasons:
+
+1. **Architectural mismatch**: WASM plugins are designed for request filtering (intercepting and modifying requests in transit), not for implementing API endpoints. An `/api/validate` endpoint with cookie management is a service responsibility, not a filter responsibility.
+
+2. **Unnecessary middleware layer**: The planned flow (`client → WASM plugin → jwt-auth-service`) added an extra hop with no added value. The WASM plugin would have simply proxied requests to jwt-auth-service.
+
+3. **Code duplication with [istio-jwt-wasm](https://github.com/Klazomenai/istio-jwt-wasm)**: Both repositories contained near-identical JWT parsing logic for JTI extraction (`pkg/jwt/extractor.go` vs `pkg/jwt/parser.go`), duplicating base64url decoding and claim extraction without signature verification.
+
+4. **Incomplete implementation**: Only the JWT parsing utilities and CI/CD infrastructure were completed. The core WASM filter logic (`main.go`), CSRF validation (`pkg/csrf/`), and cookie management (`pkg/cookie/`) were never implemented.
+
+### Where This Functionality Moved
+
+The `/api/validate` endpoint, CSRF validation, and HttpOnly cookie management were implemented directly in [jwt-auth-service](https://github.com/Klazomenai/jwt-auth-service) as native Go HTTP handlers (shipped in v0.1.3-alpha.0).
+
+### Active Repositories
+
+| Repository | Purpose | Status |
+|-----------|---------|--------|
+| [jwt-auth-service](https://github.com/Klazomenai/jwt-auth-service) | JWT token lifecycle: creation, validation, revocation, auto-renewal, `/api/validate` + cookies | Active (v0.1.3-alpha.0) |
+| [istio-jwt-wasm](https://github.com/Klazomenai/istio-jwt-wasm) | Gateway-level JWT revocation enforcement via Envoy WASM filter | Active (v0.0.1-alpha) |
+
+### What Remains Useful
+
+- **Nix flakes CI/CD patterns**: Reproducible WASM + OCI image builds via pure Nix (`flake.nix`)
+- **Proxy-WASM Go SDK skeleton**: Boilerplate for `vmContext`/`pluginContext`/`httpContext` lifecycle
+- **JWT parsing utilities**: `pkg/jwt/parser.go` with comprehensive test coverage
+
+---
+
+## Original Overview
 
 WASM plugin that validates JWT tokens via two-stage authentication:
 1. CSRF token validation
